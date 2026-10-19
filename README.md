@@ -25,6 +25,19 @@ DSH agent loop → llm-pi-ai(workbuddy 路由) → bridge :8790 → copilot.tenc
 
 ## 一键安装（桌面版）
 
+### 从 GitHub 直接装（推荐，不需要解压安装包）
+
+```bash
+dsh plugin --profile web add github:335589054/DSH-bridge       # 网页端 profile
+dsh plugin --profile desktop add github:335589054/DSH-bridge   # 桌面版 profile
+```
+
+仓库根就是完整的插件包：`bridge/`（含随包 `certs/` 和 `capture/`）已经打进包内，
+装完重启 DSH 就会自动拉起 `127.0.0.1:8790` 的网关。git 安装不跑 `prepare` 构建，
+因为 `lib/` 是直接提交进仓库的。
+
+### 从仓库源码 / zip 安装
+
 ```bash
 node packages/dsh-plugin-workbuddy/install.mjs --quick
 ```

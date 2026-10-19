@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "WorkBuddy 模型",
-    "description": "把模型请求经本机 127.0.0.1 的 bridge 转到 WorkBuddy 订阅账号。"
-  }
-}

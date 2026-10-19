@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "WorkBuddy Models",
-    "description": "Routes DeepSeek Harness model requests to the WorkBuddy subscription through a local bridge on 127.0.0.1."
-  }
-}

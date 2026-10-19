@@ -221,6 +221,28 @@ bridge 里任何「拉起另一个 GUI 程序」的 spawn（`workbuddy-client.mj
 
 ---
 
+### 12. 插件包自包含：`bridge/` 是复制品，改完源码必须重新同步
+
+`dsh plugin --profile web add github:335589054/DSH-bridge` 走的是 pnpm 的 git 依赖：
+它把**仓库根**当成 npm 包装进 `node_modules/dsh-plugin-workbuddy/`，**没有** sibling 的
+`../bridge`、`../capture`。所以插件包必须自包含。
+
+- 仓库根 `package.json` 是**门面**：`main` / `exports` / `dsh.bundle.patch` 全指向
+  `packages/dsh-plugin-workbuddy/`；两个包名都叫 `dsh-plugin-workbuddy`（bundle 的
+  `insert` 行按包名解析，必须一致）
+- `packages/dsh-plugin-workbuddy/bridge/` 是 `packages/bridge`（含 `certs/`）与
+  `packages/capture` 的**复制品**，由 `node tools/bundle_plugin.mjs --clean` 生成
+- 代码里的路径一律「**先包内、后 sibling**」双落点，所以仓库源码形态与本机 `link:` 安装
+  行为不变：`lib/index.js` 的 `BRIDGE_DIR`、`server.mjs` 的 `addonPath` / `loadModelIds`、
+  `install.mjs` 与 `sync-models.mjs` 的 `BRIDGE_DIR`
+- **改完 `packages/bridge` 或 `packages/capture` 后要重跑 `tools/bundle_plugin.mjs` 再提交**，
+  否则 GitHub 装出来的仍是旧代码（复制品不会自己更新）
+- 复制时排除 `.tools/`（mitm venv，数万文件）、`.ca/`、`.bridge-token`、`.capture-key`、
+  `*.log`、`__pycache__`；`.gitignore` 里也做了全仓库通配，**不要提交**
+- git 安装不跑 `prepare`/`build`：`lib/`、`client.js`、`cordis.patch.yml` 必须已提交
+
+---
+
 ## live 模式的数据流
 
 ```
