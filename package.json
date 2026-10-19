@@ -1,0 +1,29 @@
+{
+  "name": "dsh-plugin-workbuddy",
+  "version": "0.6.0",
+  "private": false,
+  "type": "module",
+  "description": "把 WorkBuddy 订阅模型接入 DeepSeek Harness：本地 bridge + llm-pi-ai 手写网关路由 + 抓包/环境管理面板",
+  "keywords": ["dsh-plugin", "deepseek-harness", "workbuddy", "llm"],
+  "license": "MIT",
+  "main": "./packages/dsh-plugin-workbuddy/lib/index.js",
+  "exports": {
+    ".": "./packages/dsh-plugin-workbuddy/lib/index.js",
+    "./client": "./packages/dsh-plugin-workbuddy/client.js",
+    "./route": "./packages/dsh-plugin-workbuddy/lib/route.mjs",
+    "./locale/*.json": "./packages/dsh-plugin-workbuddy/locale/*.json",
+    "./icon": "./packages/dsh-plugin-workbuddy/icon.svg",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": { "patch": "./packages/dsh-plugin-workbuddy/cordis.patch.yml" },
+    "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-settings"] }
+  },
+  "scripts": {
+    "bundle:bridge": "node tools/bundle_plugin.mjs --clean",
+    "sync-models": "node packages/dsh-plugin-workbuddy/sync-models.mjs",
+    "install:dsh": "node packages/dsh-plugin-workbuddy/install.mjs",
+    "uninstall:dsh": "node packages/dsh-plugin-workbuddy/install.mjs --uninstall"
+  },
+  "engines": { "node": "^22.19.0 || >=24.0.0" }
+}

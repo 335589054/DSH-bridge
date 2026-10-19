@@ -1,0 +1,24 @@
+node_modules/
+.env
+.env.*
+*.log
+.cache/
+dist/
+.DS_Store
+
+# —— 运行期状态：bridge 的本地令牌、抓包密钥、会话、代理接管状态、局域网配置 ——
+# 这些是本机私有数据，任何一份 bridge 目录（源码的、插件包内的）都不能进仓库
+.bridge-token
+.capture-key
+.session.json
+.proxy-backup.json
+.launch-state.json
+.bridge-config.json
+
+# mitmproxy 独立虚拟环境与运行期证书目录（数万文件，且与机器绑定）
+.tools/
+.ca/
+
+packages/**/dist/
+__pycache__/
+*.pyc

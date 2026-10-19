@@ -1,0 +1,17 @@
+{
+  "description": "WorkBuddy bridge 生命周期钩子",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CODEBUDDY_PLUGIN_ROOT}/hooks/ensure-bridge.mjs\"",
+            "description": "会话开始时确保本地 WorkBuddy bridge 已就绪（未运行则拉起）",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

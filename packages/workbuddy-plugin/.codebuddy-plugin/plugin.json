@@ -1,0 +1,30 @@
+{
+  "name": "workbuddy-llm-bridge",
+  "version": "0.1.0",
+  "description": "把 WorkBuddy 订阅模型本地导出为 OpenAI 兼容接口，并给 DeepSeek Harness 提供模型路由",
+  "author": {
+    "name": "workbuddytoharness"
+  },
+  "keywords": [
+    "workbuddy",
+    "dsh",
+    "llm",
+    "openai-compatible",
+    "bridge"
+  ],
+  "commands": "./commands",
+  "skills": "./skills",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": {
+    "workbuddy-bridge": {
+      "command": "node",
+      "args": [
+        "${CODEBUDDY_PLUGIN_ROOT}/mcp/server.mjs"
+      ],
+      "env": {
+        "WORKBUDDY_BRIDGE_URL": "http://127.0.0.1:8790"
+      },
+      "defer_loading": true
+    }
+  }
+}

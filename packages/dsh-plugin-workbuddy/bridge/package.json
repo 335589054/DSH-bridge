@@ -1,0 +1,27 @@
+{
+  "name": "workbuddy-llm-bridge",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Expose WorkBuddy subscription models as an OpenAI-compatible local endpoint",
+  "main": "server.mjs",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "mock": "node -e \"process.env.WORKBUDDY_MOCK='1';import('./server.mjs')\"",
+    "ctl": "node ctl.mjs",
+    "link": "node link.mjs",
+    "health": "node -e \"fetch('http://127.0.0.1:8790/health').then(r=>r.json()).then(console.log)\""
+  },
+  "files": [
+    "server.mjs",
+    "admin.mjs",
+    "credentials.mjs",
+    "session.mjs",
+    "ctl.mjs",
+    "link.mjs",
+    "certs"
+  ]
+}
