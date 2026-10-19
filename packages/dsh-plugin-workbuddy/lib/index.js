@@ -11,7 +11,8 @@
  * 约定：绝不让这里抛异常。插件加载失败会连带整个 DSH 起不来，代价远大于网关缺席。
  */
 import { spawn } from 'node:child_process'
-import { closeSync, existsSync, openSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -26,6 +27,12 @@ const SIBLING_BRIDGE = join(HERE, '..', '..', 'bridge')
 const BRIDGE_DIR = existsSync(join(BUNDLED_BRIDGE, 'server.mjs')) ? BUNDLED_BRIDGE : SIBLING_BRIDGE
 const BRIDGE_ENTRY = join(BRIDGE_DIR, 'server.mjs')
 const BRIDGE_LOG = join(BRIDGE_DIR, 'bridge.log')
+const BRIDGE_TOKEN_FILE = join(BRIDGE_DIR, '.bridge-token')
+
+// DSH 的凭证引用：路由里 apiKeyEnv=WORKBUDDY_BRIDGE_TOKEN，值来自这里
+const DSH_HOME = process.env.DSH_HOME || join(homedir(), '.dsh')
+const CRED_FILE = join(DSH_HOME, '.credentials.yaml')
+const TOKEN_REF = 'WORKBUDDY_BRIDGE_TOKEN'
 
 let spawning = false
 
@@ -40,6 +47,58 @@ async function probe(timeoutMs = 800) {
     return res.ok ? await res.json() : null
   } catch {
     return null
+  }
+}
+
+/**
+ * 把 bridge 的本地令牌同步进 DSH 凭证文件。
+ *
+ * 为什么必须在 host 半体里做：路由用的是 `apiKeyEnv: WORKBUDDY_BRIDGE_TOKEN`，
+ * 这个值来自 `$DSH_HOME/.credentials.yaml` 的 `refs:`。以前只有 `install.mjs` 写它，
+ * 而 `dsh plugin add github:...` 这条路**不会**跑安装器 —— 于是 bridge 换一份新的
+ * （令牌重新生成）、DSH 还拿着旧令牌，每个请求都 401。
+ *
+ * 约定：尽力而为，任何异常都只记日志（插件加载不能因为它失败）。
+ * 只在值不同时写盘，避免每次启动都动用户的凭证文件。
+ */
+function upsertRef(content, name, value) {
+  const lines = content.split(/\r?\n/)
+  const refIdx = lines.findIndex((l) => /^refs:\s*$/.test(l))
+  if (refIdx === -1) {
+    const head = content.replace(/\s*$/, '\n')
+    return `${head}refs:\n  ${name}: ${value}\n`.replace(/^\n/, '')
+  }
+  let insertAt = refIdx + 1
+  for (let i = refIdx + 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.trim() !== '' && !/^\s/.test(line)) break
+    if (new RegExp(`^\\s+${name}:`).test(line)) {
+      lines[i] = `  ${name}: ${value}`
+      return lines.join('\n')
+    }
+    if (line.trim() !== '') insertAt = i + 1
+  }
+  lines.splice(insertAt, 0, `  ${name}: ${value}`)
+  return lines.join('\n')
+}
+
+function syncCredential() {
+  try {
+    if (!existsSync(BRIDGE_TOKEN_FILE)) return 'no-token'
+    const token = readFileSync(BRIDGE_TOKEN_FILE, 'utf8').trim()
+    if (!token) return 'empty-token'
+    if (!existsSync(CRED_FILE)) {
+      mkdirSync(dirname(CRED_FILE), { recursive: true })
+      writeFileSync(CRED_FILE, `version: 1\nrefs:\n  ${TOKEN_REF}: ${token}\n`, { mode: 0o600 })
+      return 'created'
+    }
+    const before = readFileSync(CRED_FILE, 'utf8')
+    const after = upsertRef(before, TOKEN_REF, token)
+    if (after === before) return 'unchanged'
+    writeFileSync(CRED_FILE, after, { mode: 0o600 })
+    return 'updated'
+  } catch (err) {
+    return `error: ${(err && err.message) || err}`
   }
 }
 
@@ -102,7 +161,12 @@ async function replaceSelfHosted(pid) {
 /** 网关没起就拉起来；已有一份但是自托管的，换成自己拉起的 */
 export async function ensureBridge() {
   const health = await probe()
-  if (health && health.ok && !health.selfHosted) return 'already-running'
+  if (health && health.ok && !health.selfHosted) {
+    // 已经在跑也要同步：期间可能重装过插件，令牌换了而 DSH 还拿旧的
+    const cred = syncCredential()
+    if (process.env.WORKBUDDY_DEBUG === '1') console.log(`[workbuddy] credential ${cred}`)
+    return 'already-running'
+  }
   if (health && health.ok && health.selfHosted) {
     const replaced = await replaceSelfHosted(health.pid)
     if (!replaced) return `self-hosted bridge (pid=${health.pid}) 换不掉，继续用旧的`
@@ -116,7 +180,12 @@ export async function ensureBridge() {
   // 给一点启动时间，让紧随其后的设置页请求不至于扑空
   for (let i = 0; i < 25; i++) {
     await sleep(200)
-    if (await probe(400)) return r
+    if (await probe(400)) {
+      // 令牌是 bridge 启动时生成的，这里才拿得到；同步到 DSH 凭证后请求才不会 401
+      const cred = syncCredential()
+      if (process.env.WORKBUDDY_DEBUG === '1') console.log(`[workbuddy] credential ${cred}`)
+      return r
+    }
   }
   return `${r} (health 未就绪)`
 }
