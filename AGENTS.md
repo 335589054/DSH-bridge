@@ -241,6 +241,14 @@ bridge 里任何「拉起另一个 GUI 程序」的 spawn（`workbuddy-client.mj
   `*.log`、`__pycache__`；`.gitignore` 里也做了全仓库通配，**不要提交**
 - git 安装不跑 `prepare`/`build`：`lib/`、`client.js`、`cordis.patch.yml` 必须已提交
 
+> **真实踩过的坑**：profile 里原本是 `link:E:/.../packages/dsh-plugin-workbuddy`，
+> 第一次跑 `dsh plugin --profile web add github:...` 替换这个 `link:` 依赖时，
+> **pnpm 把链接目标目录的内容清空了**（源码目录当场变空，git 里于是多了一次 32 个文件的删除）。
+> 之后装出来的包缺 `cordis.patch.yml`，DSH 直接报
+> `failed to read overlay ... ENOENT` 并拒绝加载该 bundle。
+> 换 spec 前先 `git status` 留个底；万一被清空，用
+> `git restore --source=<上一次提交> -- packages/dsh-plugin-workbuddy` 找回。
+
 ---
 
 ## live 模式的数据流
