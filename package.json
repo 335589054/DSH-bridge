@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-workbuddy",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": false,
   "type": "module",
   "description": "把 WorkBuddy 订阅模型接入 DeepSeek Harness：本地 bridge + llm-pi-ai 手写网关路由 + 抓包/环境管理面板",

@@ -388,22 +388,24 @@ export function createAdmin({ dir, capturePort = 8899, bridgePort = 8790, captur
   /**
    * 装 mitmproxy。
    *
-   * PyPI 在国内经常连不上：`files.pythonhosted.org` 读超时、pypi.org 连接被重置
-   * （10054）。以前只能让用户自己设 WORKBUDDY_PIP_INDEX 再点一次，现在默认按
-   * 「官方源 → 清华 → 阿里云」依次重试，全失败才报错。
+   * PyPI 在国内基本不可用：`files.pythonhosted.org` 读超时、pypi.org 连接被重置
+   * （10054）。以前要用户自己设 WORKBUDDY_PIP_INDEX 再点一次；现在**镜像优先**：
+   * 清华 → 阿里云 → 官方 PyPI（官方留作境外网络/镜像被封时的最后兜底）。
+   *
+   * 为什么不先试官方再回退：官方源每个包都要等到读超时才动，光等就几分钟，
+   * 用户看到的是「安装一直转圈」。镜像在国内通常十几秒就能出结果。
    *
    * - 设了 WORKBUDDY_PIP_INDEX 就只认那一个：内网源不希望被悄悄绕过
-   * - 每次尝试都带 --retries 1 --timeout 20：官方源不通时要尽快失败，
-   *   别把 900s 的预算全耗在第一个源上
+   * - 每次尝试都带 --retries 1 --timeout 20：死源要尽快放弃，别把 900s 预算耗在一个源上
    */
   async function pipInstallMitmproxy() {
     const configured = process.env.WORKBUDDY_PIP_INDEX
     const candidates = configured
       ? [{ index: configured, label: 'WORKBUDDY_PIP_INDEX' }]
       : [
-          { index: null, label: '官方 PyPI' },
           { index: 'https://pypi.tuna.tsinghua.edu.cn/simple', label: '清华镜像' },
           { index: 'https://mirrors.aliyun.com/pypi/simple', label: '阿里云镜像' },
+          { index: null, label: '官方 PyPI' },
         ]
     let lastError = ''
     for (let i = 0; i < candidates.length; i++) {
