@@ -515,8 +515,10 @@ function sourceInfo() {
   } catch {
     /* 版本读不到不影响安装 */
   }
-  // 仓库源码的判据：往上两级还有 packages/dsh-plugin-workbuddy
-  const isRepo = existsSync(join(PACKAGE_ROOT, '..', '..', 'packages', 'dsh-plugin-workbuddy'))
+  // 仓库源码的判据：往上两级还有 packages/dsh-plugin-workbuddy。
+  // 但 git 安装形态下包内本来就带着这层目录（仓库根门面 → packages/…），
+  // 所以要先把 node_modules 里的那份排除掉，否则会把「pnpm 安装」误报成「仓库源码」。
+  const isRepo = !IN_NODE_MODULES && existsSync(join(PACKAGE_ROOT, '..', '..', 'packages', 'dsh-plugin-workbuddy'))
   let linkedTo = null
   try {
     const { pkgFile } = bundlePaths()
@@ -621,7 +623,7 @@ async function main() {
   const h2 = await health()
   if (h2) ok('/health 可达')
   else warn('/health 不可达（bridge 没在跑：去掉 --no-start 再跑一次）')
-  ok(`安装源 ${src.isRepo ? '仓库源码' : c.warn('安装包副本')} · v${src.version}`)
+  ok(`安装源 ${src.isRepo ? '仓库源码' : src.isGitInstall ? 'dsh plugin add 安装' : c.warn('安装包副本')} · v${src.version}`)
   const patch = readFileSync(PATCH_FILE, 'utf8')
   const st0 = bundleState()
   const routeFrom = st0.listed ? 'bundle 层' : patch.includes('dsh-plugin-workbuddy (managed)') ? '用户补丁' : null
