@@ -158,13 +158,35 @@ async function replaceSelfHosted(pid) {
   return false
 }
 
+/**
+ * 同步凭证并等它落地。
+ *
+ * 单独调用一次不够稳：bridge 刚 started 时 .bridge-token 可能还没被读到
+ * （Windows 上安全软件会短暂占用新文件），过一次就放弃会让「装完第一次启动」
+ * 拿不到令牌、每个请求 401。这里重试 3 秒，失败就把状态打到日志里，别静默。
+ */
+async function syncCredentialWithRetry() {
+  for (let i = 0; i < 15; i++) {
+    const cred = syncCredential()
+    if (cred === 'created' || cred === 'updated' || cred === 'unchanged') {
+      if (process.env.WORKBUDDY_DEBUG === '1') console.log(`[workbuddy] credential ${cred}`)
+      return cred
+    }
+    if (i === 14) {
+      console.log(`[workbuddy] 凭证同步失败（${cred}）：DSH 侧请求会 401，检查 ${CRED_FILE}`)
+      return cred
+    }
+    await sleep(200)
+  }
+  return 'unreachable'
+}
+
 /** 网关没起就拉起来；已有一份但是自托管的，换成自己拉起的 */
 export async function ensureBridge() {
   const health = await probe()
   if (health && health.ok && !health.selfHosted) {
     // 已经在跑也要同步：期间可能重装过插件，令牌换了而 DSH 还拿旧的
-    const cred = syncCredential()
-    if (process.env.WORKBUDDY_DEBUG === '1') console.log(`[workbuddy] credential ${cred}`)
+    await syncCredentialWithRetry()
     return 'already-running'
   }
   if (health && health.ok && health.selfHosted) {
@@ -182,8 +204,7 @@ export async function ensureBridge() {
     await sleep(200)
     if (await probe(400)) {
       // 令牌是 bridge 启动时生成的，这里才拿得到；同步到 DSH 凭证后请求才不会 401
-      const cred = syncCredential()
-      if (process.env.WORKBUDDY_DEBUG === '1') console.log(`[workbuddy] credential ${cred}`)
+      await syncCredentialWithRetry()
       return r
     }
   }
