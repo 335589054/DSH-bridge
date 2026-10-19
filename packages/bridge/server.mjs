@@ -931,9 +931,23 @@ async function handleRequest(req, res) {
     const body = req.method === 'POST' ? await readJsonBody(req) : {}
     if (url.pathname === '/setup/status') {
       const s = await admin.status({ fresh: url.searchParams.get('fresh') === '1' })
-      return json(res, 200, { ...s, lan: lan.status() })
+      return json(res, 200, { ...s, lan: lan.status(), session: sessionStore.status() })
     }
     if (url.pathname === '/setup/link') return json(res, 200, linkInfo())
+
+    // —— 「记住会话」：默认关闭，开了才把抓到的会话落盘（0600），bridge 重启仍可用 ——
+    if (url.pathname === '/setup/session' && req.method === 'GET') {
+      return json(res, 200, { ok: true, session: sessionStore.status() })
+    }
+    if (url.pathname === '/setup/session' && req.method === 'POST') {
+      const on = body.persist !== false
+      sessionStore.setPersist(on)
+      pushLog(
+        admin.log,
+        on ? '[session] 已开启「记住会话」：会话写入 .session.json（0600），重启后仍有效' : '[session] 已关闭「记住会话」：只存内存，重启后需重新抓包',
+      )
+      return json(res, 200, { ok: true, session: sessionStore.status() })
+    }
     if (url.pathname === '/setup/install' && req.method === 'POST') return json(res, 200, await admin.install())
     if (url.pathname === '/setup/ca' && req.method === 'POST') return json(res, 200, await admin.installCa())
     if (url.pathname === '/proxy' && req.method === 'POST') return json(res, 200, await admin.setProxy(body.enabled !== false))

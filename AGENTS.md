@@ -283,13 +283,21 @@ mitmdump :8899（addon: packages/capture/mitm_addon.py）
    │  从 WorkBuddy 真实请求里摘 authorization / x-user-id / x-domain 等白名单头
    │  POST /capture/session   (x-capture-key)
    ▼
-sessionStore（只存内存，WORKBUDDY_PERSIST=1 才落盘 0600）
+sessionStore（默认只存内存；设置页「记住会话」或 WORKBUDDY_PERSIST=1 才落盘 0600）
    │
    └─ bridge 每次请求取用
 ```
 
 规则：
 
+- **默认不落盘**，这是既定决策：凭证只在网关进程内存里。用户可以在设置页
+  「会话记忆」里打开，开关存 `bridge/.session-prefs.json`，落盘文件是
+  `bridge/.session.json`（0600，已 gitignore）。`WORKBUDDY_PERSIST=1` 是同一开关的
+  环境变量入口，给没有设置页的部署用
+- 打开开关时会**立刻把内存里的会话落盘**（用户不必重抓一次）；关闭时删掉磁盘副本。
+  `clear()`（401 作废、手动清除）内存与磁盘一起清，避免下次启动又捡起作废令牌
+- 为什么需要它：bridge 归 DSH 拉起，重装插件 / 重启 DSH 都会换进程，纯内存态会让用户
+  每次升级后都得重抓一次
 - 只保留白名单头（见 `session.mjs` 的 `ALLOWED`），别把 `accept-encoding` / `content-length` 带进重放
 - 过期时间从 JWT `exp` 解析；解析不到就交给上游 401 兜底
 - **401 必须作废抓包会话**：`type === 'captured'` 且上游 401 → `sessionStore.clear()`，
@@ -330,6 +338,7 @@ sessionStore（只存内存，WORKBUDDY_PERSIST=1 才落盘 0600）
 | `POST /setup/lan` | 局域网开关（热切 `127.0.0.1` ↔ `0.0.0.0`，先探能否绑定） |
 | `GET·POST /setup/keys` · `/setup/keys/{enable,delete,verify}` | API 密钥（生成时明文只回一次 / 启停 / 删除 / 本地校验） |
 | `POST /setup/api` | 单接口开关（`chat` / `models`） |
+| `GET·POST /setup/session` | 「记住会话」开关（默认关闭；开启后会话落盘 0600，网关重启仍可用） |
 
 命令行等价物：`bridge/ctl.mjs`（`status` / `capture start|stop` / `ca install` / `proxy on|off`）。
 `install.mjs --quick` = 安装 + 装证书 + 抓一次会话（等 120s，抓到自动停代理）。

@@ -503,6 +503,7 @@ window.__ModuleLoader__.load({
       const wbClient = proxy.client || {}
       const mitm = status.mitmproxy || {}
       const ca = status.ca || {}
+      const session = status.session || {}
       const py = status.python || {}
       const lanSt = status.lan || null
       const captured = Boolean(health && health.capture && health.capture.captured)
@@ -674,6 +675,31 @@ window.__ModuleLoader__.load({
             }, '停止并还原')),
           h('div', { style: { fontSize: 11, color: C.muted, lineHeight: 1.6, marginTop: 6 } },
             '「开始抓包」会重启一次 WorkBuddy，并给它注入 HTTP_PROXY=127.0.0.1:8899（客户端启动时自己调 session.setProxy，只作用于它自己）—— 不写注册表、不改系统代理、不需要管理员。重启后去 WorkBuddy 里发一条消息；点「停止并还原」会关掉这份进程，再按接管前的环境帮你打开。')),
+
+        h(Card, { title: '会话记忆' },
+          h(Row, { label: '当前会话' },
+            h(Dot, { ok: Boolean(session.captured) && !session.expired, warn: Boolean(session.captured) && session.expired }),
+            !session.captured
+              ? '未捕获'
+              : session.expired
+                ? `已过期（${session.expiresAt || '时间未知'}）`
+                : `${session.source || '抓包'} · ${session.domain || '上游'} · 有效至 ${session.expiresAt || '未知'}`),
+          h(Row, {
+            label: '记住会话',
+            copy: h(Btn, {
+              onClick: act('persist', () => api('/setup/session', 'POST', { persist: !session.persist })),
+              busy: busy === 'persist',
+            }, session.persist ? '关闭' : '开启'),
+          },
+          h(Dot, { ok: Boolean(session.persist), warn: !session.persist }),
+          session.persist
+            ? (session.persisted ? '已开启（会话已落盘）' : '已开启（抓到会话后落盘）')
+            : '已关闭（只存内存）'),
+          h('div', { style: { fontSize: 11, color: C.muted, lineHeight: 1.7, marginTop: 6 } },
+            '关闭时凭证只存在网关内存里：重装插件或重启 DSH 都会换一份网关进程，之后要重新抓一次。',
+            '开启后会写入 ',
+            h('span', { style: { fontFamily: MONO } }, 'bridge/.session.json'),
+            '（权限 0600，已 gitignore），网关重启仍能复用，直到令牌到期。只在自己的机器上开。')),
 
         note && note.text
           ? h('div', { style: { fontSize: 12, color: note.bad ? C.bad : C.ok, lineHeight: 1.6 } }, note.text)

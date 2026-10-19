@@ -94,6 +94,8 @@ const BRIDGE_TOKEN_FILE = join(BRIDGE_DIR, '.bridge-token')
 const BASE_URL = DEFAULT_BASE_URL.replace(':8790', `:${PORT}`)
 const PROVIDER_HINT = 'workbuddy'
 const BUNDLE_NAME = 'dsh-plugin-workbuddy'
+/** 本包是否位于 profile 的 node_modules 里 —— 即「由 dsh plugin add github:… 安装」 */
+const IN_NODE_MODULES = /[\\/]node_modules[\\/]/i.test(PACKAGE_ROOT)
 
 const c = {
   ok: (s) => `\x1b[32m${s}\x1b[0m`,
@@ -387,6 +389,15 @@ function installBundleLayer() {
     warn('指定了 --no-bundle：只写补丁，插件列表里不会出现')
     return false
   }
+  // 通过 `dsh plugin add github:…` 安装时，包已经在 profile 的 node_modules 里、
+  // 由 pnpm（git 依赖）管理。这里再写 `link:<源码路径>` 会把依赖改成指向本机源码，
+  // 等于覆盖掉 git 安装 —— 历史上还因此把源码目录清空过一次。
+  // 此时 bundle 清单本来就登记好了，直接当作「已登记」，让主流程去清用户补丁里的旧托管块。
+  if (IN_NODE_MODULES) {
+    warn('检测到本包由 dsh plugin add github:… 安装（位于 profile 的 node_modules 内）')
+    ok('跳过 bundle 登记与目录链接：pnpm 已登记，再写 link: 会覆盖 git 依赖')
+    return true
+  }
   const { pkgFile, link } = bundlePaths()
   if (!existsSync(pkgFile)) {
     warn(`找不到 ${pkgFile}，跳过 bundle 登记`)
@@ -516,7 +527,7 @@ function sourceInfo() {
   } catch {
     /* profile 清单坏了会有别的报错兜着 */
   }
-  return { version, isRepo, linkedTo, dir: PACKAGE_ROOT }
+  return { version, isRepo, isGitInstall: IN_NODE_MODULES, linkedTo, dir: PACKAGE_ROOT }
 }
 
 function samePath(a, b) {
@@ -555,12 +566,14 @@ async function main() {
   const src = sourceInfo()
   step('安装源')
   console.log(`  ${c.dim('目录')} ${src.dir}`)
-  console.log(`  ${c.dim('版本')} ${src.version}${src.isRepo ? c.dim('（仓库源码）') : c.dim('（安装包副本）')}`)
-  if (!src.isRepo) {
+  console.log(`  ${c.dim('版本')} ${src.version}${src.isRepo ? c.dim('（仓库源码）') : src.isGitInstall ? c.dim('（dsh plugin add 安装）') : c.dim('（安装包副本）')}`)
+  if (src.isGitInstall) {
+    ok('bundle 与依赖由 pnpm（git）管理，本安装器只补凭证、清掉用户补丁里的旧托管块')
+  } else if (!src.isRepo) {
     warn('这是安装包副本（zip 解压目录）—— 它是一份静态快照，改仓库源码不会影响这里')
     warn('正在改源码的话，请改用仓库里的 packages/dsh-plugin-workbuddy/install.mjs 重装')
   }
-  if (src.linkedTo && !samePath(src.linkedTo, src.dir)) {
+  if (!src.isGitInstall && src.linkedTo && !samePath(src.linkedTo, src.dir)) {
     warn(`profile 原本指向 ${src.linkedTo}`)
     warn(`本次改成 ${src.dir}（旧路径里那份不会再被加载）`)
   }

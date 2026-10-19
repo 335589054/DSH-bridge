@@ -68,6 +68,7 @@ node install.mjs --uninstall        # 还原（bundle 登记 + 补丁 + 凭证�
 | 局域网 | `POST /setup/lan` `{enabled}` —— 热切监听地址（`127.0.0.1` ↔ `0.0.0.0`），并校验能否绑定 |
 | API 密钥 | `GET/POST /setup/keys`、`POST /setup/keys/{enable,delete,verify}` —— 生成（明文仅返回一次）/ 启停 / 删除 / 本地校验 |
 | API 开关 | `POST /setup/api` `{name, enabled}` —— `chat` / `models` 可分别关闭（503 `API_DISABLED`） |
+| 会话记忆 | `GET/POST /setup/session` —— 「记住会话」开关：关闭只存内存；开启则落盘 `bridge/.session.json`（0600），网关重启仍可用 |
 
 管理接口的护栏：必须带 `x-bridge-admin: 1`，且 `Origin` 必须是回环地址
 （端口不同无所谓 —— DSH 设置页本身就跑在另一个回环端口上；非回环来源一律 403，
