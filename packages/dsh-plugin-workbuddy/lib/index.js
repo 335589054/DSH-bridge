@@ -195,7 +195,9 @@ export async function ensureBridge() {
     console.log(`[workbuddy] 换掉自托管 bridge (pid=${health.pid})，改为 DSH 自己拉起`)
   }
   const r = startDetached()
-  if (r !== 'spawned') {
+  // 注意：startDetached() 成功时返回的是 'spawned pid=<n>'，不是 'spawned'。
+  // 这里曾经写成 `r !== 'spawned'`，导致下面「等健康 + 同步凭证」整段永远不执行。
+  if (!r.startsWith('spawned')) {
     if (process.env.WORKBUDDY_DEBUG === '1') console.log(`[workbuddy] bridge ${r}`)
     return r
   }
