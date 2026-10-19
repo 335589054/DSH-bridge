@@ -385,6 +385,48 @@ export function createAdmin({ dir, capturePort = 8899, bridgePort = 8790, captur
     return statusInflight
   }
 
+  /**
+   * 装 mitmproxy。
+   *
+   * PyPI 在国内经常连不上：`files.pythonhosted.org` 读超时、pypi.org 连接被重置
+   * （10054）。以前只能让用户自己设 WORKBUDDY_PIP_INDEX 再点一次，现在默认按
+   * 「官方源 → 清华 → 阿里云」依次重试，全失败才报错。
+   *
+   * - 设了 WORKBUDDY_PIP_INDEX 就只认那一个：内网源不希望被悄悄绕过
+   * - 每次尝试都带 --retries 1 --timeout 20：官方源不通时要尽快失败，
+   *   别把 900s 的预算全耗在第一个源上
+   */
+  async function pipInstallMitmproxy() {
+    const configured = process.env.WORKBUDDY_PIP_INDEX
+    const candidates = configured
+      ? [{ index: configured, label: 'WORKBUDDY_PIP_INDEX' }]
+      : [
+          { index: null, label: '官方 PyPI' },
+          { index: 'https://pypi.tuna.tsinghua.edu.cn/simple', label: '清华镜像' },
+          { index: 'https://mirrors.aliyun.com/pypi/simple', label: '阿里云镜像' },
+        ]
+    let lastError = ''
+    for (let i = 0; i < candidates.length; i++) {
+      const { index, label } = candidates[i]
+      const args = ['-m', 'pip', 'install', '--disable-pip-version-check', '--retries', '1', '--timeout', '20']
+      if (index) args.push('--index-url', index)
+      args.push('mitmproxy')
+      pushLog(log, `[pip] 使用 ${label}${index ? `（${index}）` : ''} 安装 mitmproxy`)
+      const r = await run(VENV_PY, args, {
+        onLine: (l) => pushLog(log, `[pip] ${l}`),
+        timeout: 900_000, // 装 mitmproxy 动辄几分钟，别被默认超时掐掉
+      })
+      if (r.code === 0) {
+        if (index) pushLog(log, `[pip] ${label} 安装成功`)
+        return
+      }
+      // 报错的长栈在前、真正的原因在尾部，取尾部更有信息量
+      lastError = (r.err || r.out || 'pip install 失败').slice(-600)
+      if (i + 1 < candidates.length) pushLog(log, `[pip] ${label} 失败，换下一个源`)
+    }
+    throw new Error(lastError || 'pip install 失败')
+  }
+
   async function install() {
     if (state.install.running) return { started: false, reason: 'already-running' }
     const py = await findPython()
@@ -416,15 +458,7 @@ export function createAdmin({ dir, capturePort = 8899, bridgePort = 8790, captur
           if (r.code !== 0) throw new Error((r.err || r.out || 'venv 创建失败').slice(0, 400))
         }
         state.install.phase = 'install'
-        const pipArgs = ['-m', 'pip', 'install', '--disable-pip-version-check']
-        // 国内网络下 PyPI 经常很慢，允许用环境变量换镜像
-        if (process.env.WORKBUDDY_PIP_INDEX) pipArgs.push('--index-url', process.env.WORKBUDDY_PIP_INDEX)
-        pipArgs.push('mitmproxy')
-        const r = await run(VENV_PY, pipArgs, {
-          onLine: (l) => pushLog(log, `[pip] ${l}`),
-          timeout: 900_000, // 装 mitmproxy 动辄几分钟，别被默认超时掐掉
-        })
-        if (r.code !== 0) throw new Error((r.err || r.out || 'pip install 失败').slice(0, 600))
+        await pipInstallMitmproxy()
         const version = await mitmState()
         if (!version.installed) throw new Error(`装完仍无法运行 mitmdump：${version.error || '未知原因'}`)
         state.install.phase = 'done'

@@ -1,0 +1,17 @@
+# 统一换行：仓库里按 LF 存，Windows 检出时也不抖动。
+# 不写这几行的话，core.autocrlf=true 会让 git 反复提示「LF will be replaced by CRLF」，
+# 复制 bridge 进插件包后还会出现「文件全被改了但 diff 是空」的假象。
+* text=auto eol=lf
+
+# Windows 批处理必须是 CRLF：LF 的 .cmd 在部分环境里 goto/label 会失效
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 证书：DER(.cer) 是二进制；PEM 是文本
+*.cer binary
+*.pem text eol=lf
+
+# 图片
+*.svg text eol=lf
+*.png binary
+*.ico binary

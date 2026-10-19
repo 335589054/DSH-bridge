@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 import { cpSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -37,13 +37,21 @@ function sweep(dir) {
   }
 }
 
+/** cpSync 的过滤：目录返回 false 就整棵子树跳过，不复制再删（.tools 里有一整个 venv） */
+function keep(src) {
+  const name = src.split(/[\\/]/).pop()
+  if (SKIP_DIRS.has(name)) return false
+  if (shouldSkipFile(name)) return false
+  return true
+}
+
 const clean = process.argv.includes('--clean')
 if (clean && existsSync(DST_BRIDGE)) {
   rmSync(DST_BRIDGE, { recursive: true, force: true })
   console.log('cleaned old bundled bridge')
 }
-cpSync(SRC_BRIDGE, DST_BRIDGE, { recursive: true })
-cpSync(SRC_CAPTURE, join(DST_BRIDGE, 'capture'), { recursive: true })
+cpSync(SRC_BRIDGE, DST_BRIDGE, { recursive: true, filter: keep })
+cpSync(SRC_CAPTURE, join(DST_BRIDGE, 'capture'), { recursive: true, filter: keep })
 sweep(DST_BRIDGE)
 
 console.log(`synced -> ${DST_BRIDGE}`)
