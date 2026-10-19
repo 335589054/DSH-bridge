@@ -249,6 +249,17 @@ bridge 里任何「拉起另一个 GUI 程序」的 spawn（`workbuddy-client.mj
 > 换 spec 前先 `git status` 留个底；万一被清空，用
 > `git restore --source=<上一次提交> -- packages/dsh-plugin-workbuddy` 找回。
 
+> **升级插件（重跑 `dsh plugin add`）会 EPERM 失败**，报
+> `ERR_PNPM_EPERM: rename ... -> dsh-plugin-workbuddy`。原因是包目录被占用，来源有两个：
+> ① DSH 的 HMR watcher 盯着 profile 与插件文件；② 从包里启动的子进程 ——
+> bridge（`node_modules/.../bridge/server.mjs`）以及 `mitmdump.exe`（在
+> `bridge/.tools/mitm/Scripts/` 里，父进程 bridge 被杀后它变孤儿继续占着 exe）。
+> 所以升级顺序是：**先退出 DSH（或至少杀掉 bridge 与 mitmdump），再 `dsh plugin add`**。
+> 实在不能退 DSH 时，可以「就地同步」：把仓库里 `packages/dsh-plugin-workbuddy`
+> 覆盖到 profile 的 `node_modules/.../packages/dsh-plugin-workbuddy`（跳过 `.tools`/`.ca`/
+> 令牌/日志），让新代码立即生效；缺点是 `pnpm-lock.yaml` 仍记着旧 commit，等 DSH 重启后
+> 再跑一次 `dsh plugin add` 对齐。
+
 ---
 
 ## live 模式的数据流
